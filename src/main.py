@@ -10,6 +10,7 @@ screen = pygame.display.set_mode((screen_Width, screen_Height))
 pygame.display.set_caption("Quinn Questborne")
 
 #load image
+background = pygame.image.load("res/")
 
 run = True
 while run: 
