@@ -3,8 +3,11 @@ from pygame.locals import *
 
 pygame.init()
 
-screen_Width = 1110
-screen_Height = 600
+clock = pygame.time.Clock()
+fps = 60
+
+screen_Width = 1000
+screen_Height = 1000
 
 screen = pygame.display.set_mode((screen_Width, screen_Height))
 pygame.display.set_caption("Quinn Questborne")
@@ -13,7 +16,98 @@ pygame.display.set_caption("Quinn Questborne")
 sun_img = pygame.image.load("res/sun.png")
 bg_img = pygame.image.load("res/sky.png")
 
-tile_size = 160
+tile_size = 50
+
+
+class player():
+        def __init__(self, x, y):
+                self.images_right = []
+                self.images_left = []
+                self.index = 0
+                self.counter = 0
+                for num in range(1, 5):
+                        img_right = pygame.image.load(f"res/guy{num}.png")
+                        img_right = pygame.transform.scale(img_right, (40, 80))
+                        img_left = pygame.transform.flip(img_right, True, False)
+                        self.images_right.append(img_right)
+                        self.images_left.append(img_left)
+                self.image = self.images_right[self.index]        
+                self.rect = self.image.get_rect()
+                self.rect.x = x
+                self.rect.y = y
+                self.width = self.image.get_width()
+                self.height = self.image.get_height()
+                self.vel_y = 0
+                self.jumped = False
+                self.direction = 0
+                
+        def update (self):
+                dx = 0
+                dy = 0
+                walk_cooldown = 4
+                
+                #movment
+                key = pygame.key.get_pressed()
+                if key[pygame.K_SPACE] and self.jumped == False:
+                        self.vel_y = -15
+                        self.jumped = True
+                if key[pygame.K_SPACE] == False:
+                        self.jumped = False
+                if key[pygame.K_a]:
+                        dx -= 5
+                        self.counter += 1
+                        self.direction = -1
+                if key[pygame.K_d]:
+                        dx += 5
+                        self.counter += 1
+                        self.direction = 1
+                if key[pygame.K_a] == False and key[pygame.K_d] == False:
+                        self.counter = 0
+                        self.index = 0
+                        if self.direction == 1:
+                                self.image = self.images_right[self.index]
+                        if self.direction == -1:
+                                self.image = self.images_left[self.index]
+                
+                #animation handler
+                if self.counter > walk_cooldown:
+                        self.counter = 0
+                        self.index += 1
+                        if self.index >= len(self.images_right):
+                                self.index = 0
+                        if self.direction == 1:
+                                self.image = self.images_right[self.index]
+                        if self.direction == -1:
+                                self.image = self.images_left[self.index]
+                
+                #gravity
+                self.vel_y += 1
+                if self.vel_y > 10:
+                        self.vel_y = 10        
+                dy += self.vel_y
+                        
+                #collision
+                for tile in world.tile_list:
+                        #checking for colliction in y
+                        if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
+                                #check if below the ground i.e jumping
+                                if self.vel_y < 0:
+                                        dy = tile[1].bottom - self.rect.top
+                                #check if above the ground i.e falling
+                                if self.vel_y >= 0:
+                                        dy = tile[1].top - self.rect.bottom
+                                
+                #update player locatio
+                self.rect.x += dx
+                self.rect.y += dy
+                
+                if self.rect.bottom > screen_Height:
+                        self.rect.bottom = screen_Height
+                        dy = 0
+                        
+                #display player
+                screen.blit(self.image, self.rect)
+                pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
 
 class World():
         def __init__(self, data):
@@ -21,6 +115,7 @@ class World():
                 
                 #load image
                 dirt_img = pygame.image.load("res/dirt.png")
+                grass_img = pygame.image.load("res/grass.png")
                 
                 row_count = 0
                 for row in data:
@@ -33,29 +128,58 @@ class World():
                                         img_rect.y = row_count * tile_size
                                         tile = (img, img_rect)
                                         self.tile_list.append(tile)
+                                if tile == 2:
+                                        img = pygame.transform.scale(grass_img, (tile_size, tile_size))
+                                        img_rect = img.get_rect()
+                                        img_rect.x = col_count * tile_size
+                                        img_rect.y = row_count * tile_size
+                                        tile = (img, img_rect)
+                                        self.tile_list.append(tile)
                                 col_count +=1
                         row_count += 1       
 
         def draw(self):
                 for tile in self.tile_list:
                         screen.blit(tile[0], tile[1])
+                        pygame.draw.rect(screen, (255, 255, 255), tile[1], 2)
 
 world_data = [
-    [1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1],
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1], 
+[1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 2, 2, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 7, 0, 5, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 1], 
+[1, 7, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+[1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 7, 0, 0, 0, 0, 1], 
+[1, 0, 2, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+[1, 0, 0, 2, 0, 0, 4, 0, 0, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 2, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 2, 2, 2, 2, 1], 
+[1, 0, 0, 0, 0, 0, 2, 2, 2, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1], 
+[1, 0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 
+[1, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 
+[1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ]
 
+Player = player(100, screen_Height - 130)
 world = World(world_data)
 
 run = True
 while run: 
         
+        clock.tick(fps)
+        
         screen.blit(bg_img, (0, 0))
         screen.blit(sun_img, (100, 100))
         
         world.draw()
+        
+        Player.update()
         
         for event in pygame.event.get():
                 if event.type == pygame.QUIT:
