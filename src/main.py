@@ -18,25 +18,19 @@ screen_Height = 1000
 screen = pygame.display.set_mode((screen_Width, screen_Height))
 pygame.display.set_caption("Quinn Questborne")
 
+font_score = pygame.font.SysFont(None , 50)
+
 #load image
 sun_img = pygame.image.load("res/sun.png")
 bg_img = pygame.image.load("res/sky.png")
 restart_img = pygame.image.load("res/restart_btn.png")
 start_img = pygame.image.load("res/start_btn.png")
 exit_img = pygame.image.load("res/exit_btn.png")
-coin_img = pygame.image.load("res/coin.png")
 
-#fuction to reset level
-def reset_level(current_level):
-        Player.reset( 100, screen_Height - 130)
-        blob_group.empty()
-        lava_group.empty()
-        exit_group.empty()
-        if os.path.exists(f"level{current_level}_data"):
-                pickle_in = open(f"level{current_level}_data", "rb")
-                world_data = pickle.load(pickle_in)
-        world = World(world_data)
-        return world
+def draw_text(text, font, text_col, x, y):
+        img = font.render(text, True, text_col)
+        screen.blit(img, (x, y))
+
 #def game var
 
 #game object size
@@ -50,6 +44,24 @@ main_menu = True
 
 #max level
 max_level = 2
+
+#score
+score = 0
+
+#color
+white = (255, 255, 255)
+
+#fuction to reset level
+def reset_level(current_level):
+        Player.reset( 100, screen_Height - 130)
+        blob_group.empty()
+        lava_group.empty()
+        exit_group.empty()
+        if os.path.exists(f"level{current_level}_data"):
+                pickle_in = open(f"level{current_level}_data", "rb")
+                world_data = pickle.load(pickle_in)
+        world = World(world_data)
+        return world
 
 class Buttom():
         def __init__(self, x,y, image):
@@ -237,6 +249,9 @@ class World():
                                 if tile == 6:
                                         lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
                                         lava_group.add(lava)
+                                if tile == 7:
+                                        coin = Coin(col_count * tile_size + (tile_size // 2), row_count * tile_size + (tile_size // 2))
+                                        coin_group.add(coin)
                                 if tile == 8:
                                         exit = Exit(col_count * tile_size, row_count * tile_size - (tile_size // 2))
                                         exit_group.add(exit)
@@ -275,6 +290,14 @@ class Lava(pygame.sprite.Sprite):
                 self.rect.x = x
                 self.rect.y = y
                 
+#point class
+class Coin(pygame.sprite.Sprite):
+        def __init__(self, x, y):
+                pygame.sprite.Sprite.__init__(self)
+                img = pygame.image.load("res/coin.png")
+                self.image = pygame.transform.scale(img, (tile_size // 2, tile_size // 2))
+                self.rect = self.image.get_rect()
+                self.rect.center = (x, y)
 #exit class
 class Exit(pygame.sprite.Sprite):
         def __init__(self, x, y):
@@ -289,6 +312,7 @@ Player = player(100, screen_Height - 130)
 
 blob_group = pygame.sprite.Group()
 lava_group = pygame.sprite.Group()
+coin_group = pygame.sprite.Group()
 exit_group = pygame.sprite.Group()
 
 #load in level data
@@ -311,7 +335,6 @@ while run:
         
         screen.blit(bg_img, (0, 0))
         screen.blit(sun_img, (100, 100))
-        screen.blit(coin_img, (380, 10))
         
         if main_menu == True:
                 if exit_button.draw():
@@ -323,9 +346,14 @@ while run:
                 
                 if game_over == "Death by slime" or game_over == "bured in lava":
                         blob_group.update()
-                        
+                        #update score
+                        #check if coin collected
+                        if pygame.sprite.spritecollide(Player, coin_group, True):
+                                score +=1
+                        draw_text('X ' + str(score), font_score, white, tile_size - 10, 10)
                 blob_group.draw(screen)
                 lava_group.draw(screen)
+                coin_group.draw(screen)
                 exit_group.draw(screen)
                 
                 game_over = Player.update(game_over)
@@ -333,8 +361,10 @@ while run:
                 #when player is dead
                 if game_over == "Death by slime" or game_over == "bured in lava":
                         if restart_button.draw():
-                                Player.reset(100, screen_Height - 130)
+                                world_data = []
+                                world = reset_level(current_level)
                                 game_over = 0
+                                score = 0
 
                 #if player wins
                 if game_over == "you win":
@@ -344,9 +374,14 @@ while run:
                                 world_data = []
                                 world = reset_level(current_level)
                                 game_over = 0
+                                score = 0
                         else:
-                                #restart game
-                                pass
+                                if restart_button.draw():
+                                        current_level = 1
+                                        world_data = []
+                                        world = reset_level(current_level)
+                                        game_over = 0
+                                        score = 0
                 
         for event in pygame.event.get():
                 if event.type == pygame.QUIT:
