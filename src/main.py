@@ -4,11 +4,14 @@ from pygame.sprite import Group
 import pickle
 import os
 
+#initizing pygame
 pygame.init()
 
+#added fps cap to controlle the cpu uesage
 clock = pygame.time.Clock()
-fps = 60
+fps = 90
 
+#screen dimintion
 screen_Width = 1000
 screen_Height = 1000
 
@@ -23,10 +26,30 @@ start_img = pygame.image.load("res/start_btn.png")
 exit_img = pygame.image.load("res/exit_btn.png")
 coin_img = pygame.image.load("res/coin.png")
 
+#fuction to reset level
+def reset_level(current_level):
+        Player.reset( 100, screen_Height - 130)
+        blob_group.empty()
+        lava_group.empty()
+        exit_group.empty()
+        if os.path.exists(f"level{current_level}_data"):
+                pickle_in = open(f"level{current_level}_data", "rb")
+                world_data = pickle.load(pickle_in)
+        world = World(world_data)
+        return world
 #def game var
+
+#game object size
 tile_size = 50
+
+#game over var
 game_over = 0
+
+#start meanu var
 main_menu = True
+
+#max level
+max_level = 2
 
 class Buttom():
         def __init__(self, x,y, image):
@@ -55,6 +78,7 @@ class Buttom():
                 
                 return action
 
+#player class responsible for player movment and colliction
 class player():
         def __init__(self, x, y):
                 self.reset(x, y)
@@ -62,7 +86,7 @@ class player():
         def update (self, game_over):
                 dx = 0
                 dy = 0
-                walk_cooldown = 4
+                walk_cooldown = 2
                 
                 if game_over == 0:
                 #movment
@@ -124,20 +148,26 @@ class player():
                                                 self.vel_y = 0
                                                 self.in_air = False
                                         
-                        #check for colliction with enemys
+                        #check for colliction with objects
                         if pygame.sprite.spritecollide(self, blob_group, False):
-                                game_over = -1
+                                game_over = "Death by slime"
+                                print(game_over)
                                 
                         #check for colliction with lava
                         if pygame.sprite.spritecollide(self, lava_group, False):
-                                game_over = -1
+                                game_over = "bured in lava"
                                 print(game_over)
                         
+                        #check for colliction with exit
+                        if pygame.sprite.spritecollide(self, exit_group, False):
+                                game_over = "you win"
+                                print(game_over)
+                                
                         #update player locatio
                         self.rect.x += dx
                         self.rect.y += dy
                         
-                elif game_over == -1:
+                elif game_over == "Death by slime" or game_over == "bured in lava":
                         self.image = self.dead_image
                         if self.rect.y > 200:
                                 self.rect.y -= 5
@@ -148,11 +178,15 @@ class player():
 
                 return game_over
         
+        #the reset method is used to reset the player location and image
         def reset(self, x, y):
                 self.images_right = []
                 self.images_left = []
                 self.index = 0
                 self.counter = 0
+                
+#this creats the aniumation for the player movment by loading the 5 images of the player in order and quick so 
+#it looks like the player is moving
                 for num in range(1, 5):
                         img_right = pygame.image.load(f"res/guy{num}.png")
                         img_right = pygame.transform.scale(img_right, (40, 80))
@@ -203,6 +237,9 @@ class World():
                                 if tile == 6:
                                         lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
                                         lava_group.add(lava)
+                                if tile == 8:
+                                        exit = Exit(col_count * tile_size, row_count * tile_size - (tile_size // 2))
+                                        exit_group.add(exit)
                                 col_count +=1
                         row_count += 1       
 
@@ -237,35 +274,36 @@ class Lava(pygame.sprite.Sprite):
                 self.rect = self.image.get_rect()
                 self.rect.x = x
                 self.rect.y = y
-current_level = 1
-world_data = []
-
-#load word data
-def load_level(level_number):
-    global world_data
-    filename = f'level{level_number}_data'
-    if os.path.exists(filename):
-        with open(filename, 'rb') as file:
-            world_data = pickle.load(file)
-    else:
-        print(f'Level {level_number} data file does not exist.')
-        
-# Load the first level
-load_level(current_level)
+                
+#exit class
+class Exit(pygame.sprite.Sprite):
+        def __init__(self, x, y):
+                pygame.sprite.Sprite.__init__(self)
+                img = pygame.image.load("res/exit.png")
+                self.image = pygame.transform.scale(img, (tile_size, int(tile_size * 1.5)))
+                self.rect = self.image.get_rect()
+                self.rect.x = x
+                self.rect.y = y
 
 Player = player(100, screen_Height - 130)
 
 blob_group = pygame.sprite.Group()
 lava_group = pygame.sprite.Group()
+exit_group = pygame.sprite.Group()
 
+#load in level data
+current_level = 1
+if os.path.exists(f"level{current_level}_data"):
+        pickle_in = open(f"level{current_level}_data", "rb")
+        world_data = pickle.load(pickle_in)
 world = World(world_data)
 
-#buttom
+#buttom for start and exit
 restart_button = Buttom(screen_Width // 2 - 50, screen_Height // 2 + 100, restart_img)
 start_button = Buttom(screen_Width // 2 - 350, screen_Height // 2, start_img)
 exit_button = Buttom(screen_Width // 2 + 150, screen_Height // 2, exit_img)
 
-
+#the game loop this component is responsible for the game to load, run and loop
 run = True
 while run: 
         
@@ -283,20 +321,33 @@ while run:
         else:
                 world.draw()
                 
-                if game_over == 0:
+                if game_over == "Death by slime" or game_over == "bured in lava":
                         blob_group.update()
                         
                 blob_group.draw(screen)
                 lava_group.draw(screen)
+                exit_group.draw(screen)
                 
                 game_over = Player.update(game_over)
                 
                 #when player is dead
-                if game_over == -1:
+                if game_over == "Death by slime" or game_over == "bured in lava":
                         if restart_button.draw():
                                 Player.reset(100, screen_Height - 130)
                                 game_over = 0
-        
+
+                #if player wins
+                if game_over == "you win":
+                        current_level +=1
+                        if current_level <= max_level:
+                                #reset game to next level
+                                world_data = []
+                                world = reset_level(current_level)
+                                game_over = 0
+                        else:
+                                #restart game
+                                pass
+                
         for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                         run = False
